@@ -7,41 +7,81 @@ import {prismaClient} from "@repo/db/client"
 const app=express();
 app.use(express.json());
 
-app.post('/signup',(req,res)=>{
-     const data=CreateUserSchema.safeParse(req.body);
-
-    if(!data.success){
+app.post('/signup',async(req,res)=>{
+  
+     const parsedData=CreateUserSchema.safeParse(req.body);
+     
+    if(!parsedData.success){
+      console.log(parsedData.error);
         return res.status(411).json({message:"invalid input"})
+
     }
-     return res.json({message:"you are signed up"})
+    try{
+      //hash the password
+    const user= await prismaClient.user.create({
+      data:{
+        email:parsedData.data?.username,
+        password:parsedData.data.password,
+        name:parsedData.data.name
+      }
+    })
+
+     return res.json(user.id);
+  }catch(e){
+    console.log(e);
+    return res.status(411).json({message:"user already exsist"});
+  }
 })
 
-app.post('/signin',(req,res)=>{
-    const data=SignInSchema.safeParse(req.body);
+app.post('/signin',async(req,res)=>{
+    const parsedData=SignInSchema.safeParse(req.body);
 
-    if(!data.success){
+    if(!parsedData.success){
         return res.status(411).json({message:"invalid input"})
     }
+   
+   try{
+   const user= await prismaClient.user.findFirst({
+      where:{
+        email:parsedData.data.username,
+        password:parsedData.data.password
+      }
+    })
+    if(!user){
+      return res.status(403).json({message:"user not authorized"});
+    }
 
-   const token = jwt.sign('123',JWT_SECRET);
+    const token =jwt.sign({userId:user.id},JWT_SECRET);
 
     return res.json({token:token});
+   }catch(e){
+    console.log(e);
+    return res.json({message:"kuch to gadbad hai"})
+   }
 })
 
-app.get('/hi',async(req,res)=>{
-      try {
-    const user = await prismaClient.user.create({
-      data: {
-        name: "shakti",   // or simply name
-      },
-    });
+app.post('/room',auth,async(req,res)=>{
+     const parsedData=RoomSchema.safeParse(req.body);
+     if(!parsedData.success){
+      return res.json({message:"invalid input"});
 
-    console.log("User created:", user);
-    return res.json({message:"kuch to huwa"})
-  } catch (error) {
-    console.error("Error creating user:", error);
-    return res.json({message:"error na jare "})
-}
+     }
+
+     try{
+      //@ts-ignore
+      const userId=req.userId;
+      const room =await prismaClient.room.create({
+        data:{
+          slug:parsedData.data.roomName,
+          adminId:userId
+        }
+      })
+
+      return res.json({roomId:room.id});
+     }catch(e){
+      console.log(e);
+      return res.json("room already exsist")
+     }
 })
 
 app.post("/test",(req,res)=>{

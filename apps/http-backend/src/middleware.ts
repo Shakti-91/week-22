@@ -8,12 +8,13 @@ export function auth(req:Request,res:Response,next:NextFunction){
 
         return res.status(411).json({message:"token can not be empty"})
     }
-    const decoded=jwt.verify(token,JWT_SECRET);
+    const decoded=jwt.verify(token,JWT_SECRET)as {userId:string};
 
     if(!decoded){
         return res.status(411).json({message:"invalid token"});
     }
-
+    //@ts-ignore 
+    req.userId=decoded.userId
     next();
 
 }
