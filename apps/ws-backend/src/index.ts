@@ -2,20 +2,27 @@ import WebSocket, {WebSocketServer} from "ws"
 import jwt, { JwtPayload } from "jsonwebtoken"
 import {JWT_SECRET} from "@repo/backend-common/secret"
 import { json } from "express"
+import {prismaClient} from "@repo/db/client"
 
 const wss=new WebSocketServer({port:8080})
 
-function checkUser(token :string):string{
+function checkUser(token :string):string | null{
 
+    try{const decoded=jwt.verify(token,JWT_SECRET)
     
-    const decoded=jwt.verify(token,JWT_SECRET)
-    
-    if(!decoded ||!(decoded as JwtPayload).userid){
+    if(!decoded ||!(decoded as JwtPayload).userId){
         
-        return "" ;
+        return null ;
     }
     
     return (decoded as JwtPayload).userId;
+}catch(e){
+    console.log(e);
+    return null;
+}
+
+return null
+    
 
 }
 
@@ -29,13 +36,16 @@ const Users:User[]=[];
 
 wss.on('connection', function connection(ws,request){
     const url=request.url;
+    
     if(!url){
         return ;
     }
-
+    
     const queryParms=new URLSearchParams(url?.split('?')[1]);
     const token =queryParms.get('token') ?? "";
+    
     const userId=checkUser(token);
+    
     if(!userId){
 
         ws.close()
@@ -48,7 +58,7 @@ wss.on('connection', function connection(ws,request){
         ws
     })
 
-    ws.on('message', function message(data){
+    ws.on('message',async function  message(data){
           const parsedData=JSON.parse(data as unknown as  string);
 
           if(parsedData.type =="join_room"){
@@ -65,12 +75,22 @@ wss.on('connection', function connection(ws,request){
 
           
           if(parsedData.type =="chat"){
-            const roomId=parsedData.roomId
+             const roomId=parsedData.roomId
             const message=parsedData.message
+            
+            await prismaClient.chat.create({
+                data:{
+                    roomId,
+                    message,
+                    userId
+                }
+            })
+            
+            
             Users.forEach(user=>{
                 if(user.Rooms.includes(roomId)){
                     user.ws.send(JSON.stringify({
-                       tyep:"chat",
+                       type:"chat",
                        message,
                        roomId 
                     }))

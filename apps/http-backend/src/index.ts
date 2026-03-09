@@ -88,4 +88,23 @@ app.post("/test",(req,res)=>{
     return res.json({message:"hi there"})
 })
 
+app.get("/chat/:roomId",async (req,res)=>{
+  const roomId=Number(req.params.roomId)
+  try{
+  const messages= await prismaClient.chat.findMany({
+    where:{
+      roomId:roomId
+    },
+    orderBy:{
+      id:"desc"
+    },
+    take:20
+  })
+    return res.json({messages});
+  }catch(e){
+    console.log(e)
+    return res.status(411).json({message:"error aa gya"})
+  }
+})
+
 app.listen(3001)
